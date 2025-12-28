@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AR 掃描體驗</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.0/build/ar.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+</head>
+<body>
+    <div id="loading-screen">
+        <div class="loader"></div>
+        <p>正在載入AR場景...</p>
+    </div>
+
+    <div id="ar-container">
+        <a-scene 
+            id="ar-scene"
+            vr-mode-ui="enabled: false"
+            renderer="logarithmicDepthBuffer: true; colorManagement: true; sortObjects: true"
+            embedded
+            arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3; cameraParametersUrl: camera_para.dat; maxDetectionRate: 60; canvasWidth: 1280; canvasHeight: 720;">
+            
+            <!-- 標記物 -->
+            <a-marker id="marker" type="pattern" preset="hiro" raycaster="objects: .clickable">
+                <!-- 3D模型 -->
+                <a-entity id="model-3d" gltf-model="#model" scale="0.5 0.5 0.5" position="0 0 0" rotation="0 0 0" animation="property: rotation; to: 0 360 0; loop: true; dur: 10000"></a-entity>
+                
+                <!-- 2D圖示（備用） -->
+                <a-image id="image-2d" src="#icon" width="1" height="1" position="0 0.5 0" visible="false"></a-image>
+                
+                <!-- 互動按鈕 -->
+                <a-box class="clickable" color="#4CC3D9" position="0 0.3 0" scale="0.3 0.1 0.1" animation__mouseenter="property: scale; to: 0.35 0.12 0.12; dur: 300" animation__mouseleave="property: scale; to: 0.3 0.1 0.1; dur: 300"></a-box>
+                <a-text value="拍照" position="0 0.3 0.11" align="center" color="#fff" scale="0.5 0.5 0.5"></a-text>
+            </a-marker>
+
+            <!-- 相機 -->
+            <a-entity camera></a-entity>
+        </a-scene>
+
+        <!-- 控制面板 -->
+        <div id="control-panel">
+            <button id="switch-mode-btn" class="control-btn">切換模式</button>
+            <button id="capture-btn" class="control-btn">📷 拍照</button>
+            <button id="qr-scan-btn" class="control-btn">🔍 掃描QR碼</button>
+        </div>
+
+        <!-- QR碼掃描界面 -->
+        <div id="qr-scanner" class="hidden">
+            <div class="scanner-overlay">
+                <div class="scanner-frame"></div>
+                <p>將QR碼對準框內</p>
+                <button id="close-scanner-btn" class="close-btn">✕</button>
+            </div>
+        </div>
+
+        <!-- 拍照預覽 -->
+        <div id="photo-preview" class="hidden">
+            <div class="preview-content">
+                <img id="preview-image" alt="預覽">
+                <div class="preview-controls">
+                    <button id="save-photo-btn" class="preview-btn">保存</button>
+                    <button id="share-photo-btn" class="preview-btn">分享</button>
+                    <button id="close-preview-btn" class="preview-btn">關閉</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 隱藏的資源 -->
+    <a-assets>
+        <a-asset-item id="model" src="models/robot.glb"></a-asset-item>
+        <img id="icon" src="images/icon.png" crossorigin="anonymous">
+    </a-assets>
+
+    <script src="app.js"></script>
+</body>
+</html>
+
