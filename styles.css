@@ -115,14 +115,31 @@ body {
 }
 
 #ar-container {
-    position: relative;
+    position: fixed;
+    top: 0;
+    left: 0;
     width: 100vw;
     height: 100vh;
+    z-index: 1;
 }
 
 #ar-scene {
     width: 100%;
     height: 100%;
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+/* 確保 AR.js canvas 可見 */
+#ar-scene canvas {
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+    position: absolute;
+    top: 0;
+    left: 0;
 }
 
 #control-panel {

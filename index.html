@@ -25,13 +25,13 @@
         </div>
     </div>
 
-    <div id="ar-container" style="display: none;">
+    <div id="ar-container" style="display: none; width: 100vw; height: 100vh; position: relative;">
         <a-scene 
             id="ar-scene"
             vr-mode-ui="enabled: false"
-            renderer="logarithmicDepthBuffer: true; colorManagement: true; sortObjects: true"
+            renderer="logarithmicDepthBuffer: true; colorManagement: true; sortObjects: true; antialias: true"
             embedded
-            arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3; cameraParametersUrl: camera_para.dat; maxDetectionRate: 60; canvasWidth: 1280; canvasHeight: 720;">
+            arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3; maxDetectionRate: 60; canvasWidth: 1280; canvasHeight: 720;">
             
             <!-- 標記物 -->
             <a-marker id="marker" type="pattern" preset="hiro" raycaster="objects: .clickable">

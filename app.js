@@ -35,15 +35,17 @@ document.addEventListener('DOMContentLoaded', () => {
     setupCapture();
 });
 
-// 請求相機權限
+// 請求相機權限（僅用於觸發瀏覽器權限對話框）
 async function requestCameraPermission() {
     try {
+        // 只請求權限但不保留流，AR.js 會自己管理相機
         const stream = await navigator.mediaDevices.getUserMedia({ 
             video: { 
                 facingMode: 'environment' // 優先使用後置相機
             } 
         });
-        // 立即停止流，我們只需要權限
+        // 短暫延遲後停止，確保權限已記錄
+        await new Promise(resolve => setTimeout(resolve, 100));
         stream.getTracks().forEach(track => track.stop());
         return true;
     } catch (error) {
@@ -60,89 +62,189 @@ function startAR() {
             return;
         }
         
-        // 顯示AR容器
+        // 顯示AR容器（必須在顯示後才能初始化AR）
         const arContainer = document.getElementById('ar-container');
         arContainer.style.display = 'block';
+        arContainer.style.visibility = 'visible';
         
-        // 等待AR場景載入
-        const scene = document.querySelector('#ar-scene');
-        const loadingScreen = document.getElementById('loading-screen');
+        // 強制重繪
+        void arContainer.offsetHeight;
         
-        let resolved = false;
-        
-        // 處理場景已載入的情況
-        if (scene.hasLoaded) {
-            // 場景已經載入，直接繼續
-            setTimeout(() => {
-                loadingScreen.classList.add('hidden');
-                arInitialized = true;
-                
-                // 檢查相機是否成功啟動
+        // 等待下一幀，確保DOM已更新
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+            // 等待AR場景載入
+            const scene = document.querySelector('#ar-scene');
+            const loadingScreen = document.getElementById('loading-screen');
+            
+            if (!scene) {
+                reject(new Error('AR場景不存在'));
+                return;
+            }
+            
+            let resolved = false;
+            
+            // 監聽AR系統相機載入事件
+            const onVideoLoaded = () => {
+                console.log('✅ AR相機視頻已載入');
                 setTimeout(() => {
                     if (checkCameraStatus()) {
+                        loadingScreen.classList.add('hidden');
+                        arInitialized = true;
                         if (!resolved) {
                             resolved = true;
                             resolve();
                         }
-                    } else {
-                        // 如果相機未啟動，等待一下再檢查
+                    }
+                }, 500);
+            };
+            
+            // 監聽AR系統NFT載入
+            const onNFTLoaded = () => {
+                console.log('✅ AR NFT已載入');
+            };
+            
+            scene.addEventListener('arjs-video-loaded', onVideoLoaded);
+            scene.addEventListener('arjs-nft-loaded', onNFTLoaded);
+            
+            // 監聽場景載入
+            const onSceneLoaded = () => {
+                console.log('✅ AR場景已載入');
+                
+                // 等待AR系統初始化
+                setTimeout(() => {
+                    const arSystem = scene.systems['arjs'];
+                    if (arSystem) {
+                        console.log('✅ AR系統已初始化');
+                        
+                        // 檢查相機源
+                        const checkInterval = setInterval(() => {
+                            if (arSystem._arSource) {
+                                const video = arSystem._arSource.domElement;
+                                if (video) {
+                                    console.log('✅ 相機視頻元素已創建, readyState:', video.readyState);
+                                    
+                                    if (video.readyState >= 2) {
+                                        clearInterval(checkInterval);
+                                        loadingScreen.classList.add('hidden');
+                                        arInitialized = true;
+                                        showNotification('AR已啟動！', 'success');
+                                        if (!resolved) {
+                                            resolved = true;
+                                            resolve();
+                                        }
+                                    } else {
+                                        // 監聽視頻就緒事件
+                                        video.addEventListener('loadeddata', () => {
+                                            console.log('✅ 相機視頻數據已載入');
+                                            clearInterval(checkInterval);
+                                            loadingScreen.classList.add('hidden');
+                                            arInitialized = true;
+                                            showNotification('AR已啟動！', 'success');
+                                            if (!resolved) {
+                                                resolved = true;
+                                                resolve();
+                                            }
+                                        }, { once: true });
+                                        
+                                        video.addEventListener('error', (e) => {
+                                            console.error('❌ 相機視頻載入錯誤:', e);
+                                            clearInterval(checkInterval);
+                                            if (!resolved) {
+                                                resolved = true;
+                                                reject(new Error('相機視頻載入失敗'));
+                                            }
+                                        }, { once: true });
+                                    }
+                                }
+                            }
+                        }, 200);
+                        
+                        // 設置最大等待時間
                         setTimeout(() => {
-                            if (checkCameraStatus() && !resolved) {
+                            clearInterval(checkInterval);
+                            if (!resolved) {
+                                console.warn('⚠️ 相機初始化超時，但繼續嘗試');
+                                // 即使超時也嘗試繼續
+                                loadingScreen.classList.add('hidden');
+                                arInitialized = true;
                                 resolved = true;
                                 resolve();
                             }
-                        }, 2000);
-                    }
-                }, 1000);
-            }, 500);
-        } else {
-            // 監聽場景載入事件
-            scene.addEventListener('loaded', () => {
-                setTimeout(() => {
-                    loadingScreen.classList.add('hidden');
-                    arInitialized = true;
-                    
-                    // 檢查相機是否成功啟動
-                    setTimeout(() => {
-                        if (checkCameraStatus()) {
+                        }, 10000);
+                    } else {
+                        console.error('❌ AR系統未初始化');
+                        // 等待AR系統初始化
+                        const waitForSystem = setInterval(() => {
+                            const arSystem = scene.systems['arjs'];
+                            if (arSystem) {
+                                clearInterval(waitForSystem);
+                                console.log('✅ AR系統已初始化（延遲）');
+                                // 重新檢查相機
+                                setTimeout(() => {
+                                    const checkStatus = () => {
+                                        if (arSystem._arSource) {
+                                            const video = arSystem._arSource.domElement;
+                                            if (video && video.readyState >= 2 && video.videoWidth > 0) {
+                                                loadingScreen.classList.add('hidden');
+                                                arInitialized = true;
+                                                showNotification('AR已啟動！', 'success');
+                                                if (!resolved) {
+                                                    resolved = true;
+                                                    resolve();
+                                                }
+                                                return;
+                                            }
+                                        }
+                                        setTimeout(checkStatus, 500);
+                                    };
+                                    checkStatus();
+                                }, 1000);
+                            }
+                        }, 100);
+                        
+                        setTimeout(() => {
+                            clearInterval(waitForSystem);
                             if (!resolved) {
                                 resolved = true;
-                                resolve();
+                                reject(new Error('AR系統初始化失敗'));
                             }
-                        } else {
-                            // 如果相機未啟動，等待一下再檢查
-                            setTimeout(() => {
-                                if (checkCameraStatus() && !resolved) {
-                                    resolved = true;
-                                    resolve();
-                                }
-                            }, 2000);
+                        }, 5000);
+                    }
+                }, 1000);
+            };
+            
+            if (scene.hasLoaded) {
+                onSceneLoaded();
+            } else {
+                scene.addEventListener('loaded', onSceneLoaded, { once: true });
+            }
+            
+            // 設置總超時
+            setTimeout(() => {
+                if (!resolved) {
+                    // 在超時前最後檢查一次
+                    console.log('🔍 超時前最後檢查相機狀態...');
+                    const arSystem = scene.systems['arjs'];
+                    if (arSystem && arSystem._arSource) {
+                        const video = arSystem._arSource.domElement;
+                        if (video) {
+                            console.log('📊 視頻狀態:', {
+                                readyState: video.readyState,
+                                videoWidth: video.videoWidth,
+                                videoHeight: video.videoHeight,
+                                paused: video.paused,
+                                muted: video.muted,
+                                srcObject: !!video.srcObject
+                            });
                         }
-                    }, 1000);
-                }, 500);
-            }, { once: true });
-        }
-        
-        // 監聽AR系統錯誤
-        scene.addEventListener('arjs-video-loaded', () => {
-            console.log('AR相機已載入');
-            if (!resolved && arInitialized) {
-                resolved = true;
-                resolve();
-            }
+                    }
+                    resolved = true;
+                    reject(new Error('AR場景載入超時（15秒）'));
+                }
+            }, 15000);
+            });
         });
-        
-        scene.addEventListener('arjs-nft-loaded', () => {
-            console.log('AR NFT已載入');
-        });
-        
-        // 設置超時
-        setTimeout(() => {
-            if (!arInitialized && !resolved) {
-                resolved = true;
-                reject(new Error('AR場景載入超時'));
-            }
-        }, 15000);
     });
 }
 
@@ -150,31 +252,37 @@ function startAR() {
 function checkCameraStatus() {
     const scene = document.querySelector('#ar-scene');
     if (!scene) {
-        console.error('AR場景不存在');
+        console.error('❌ AR場景不存在');
         return false;
     }
     
     const arSystem = scene.systems['arjs'];
     
     if (!arSystem) {
-        console.error('AR系統未初始化');
+        console.error('❌ AR系統未初始化');
         return false;
     }
     
     if (!arSystem._arSource) {
-        console.warn('AR相機源未就緒');
+        console.warn('⚠️ AR相機源未就緒');
         return false;
     }
     
     const video = arSystem._arSource.domElement;
-    if (video && video.readyState >= 2) {
-        console.log('相機已就緒，readyState:', video.readyState);
-        return true;
-    } else if (video) {
-        console.log('相機正在載入，readyState:', video.readyState);
-        return false;
+    if (video) {
+        console.log('📹 相機視頻狀態 - readyState:', video.readyState, 'videoWidth:', video.videoWidth, 'videoHeight:', video.videoHeight);
+        if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
+            console.log('✅ 相機已就緒並有畫面');
+            return true;
+        } else if (video.readyState >= 2) {
+            console.log('⚠️ 相機就緒但畫面尺寸為0');
+            return false;
+        } else {
+            console.log('⏳ 相機正在載入');
+            return false;
+        }
     } else {
-        console.warn('視頻元素不存在');
+        console.warn('⚠️ 視頻元素不存在');
         return false;
     }
 }
