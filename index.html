@@ -33,6 +33,12 @@
             embedded
             arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3; maxDetectionRate: 60; canvasWidth: 1280; canvasHeight: 720;">
             
+            <!-- 資源 -->
+            <a-assets>
+                <a-asset-item id="model" src="models/robot.glb"></a-asset-item>
+                <img id="icon" src="images/icon.png" crossorigin="anonymous">
+            </a-assets>
+            
             <!-- 標記物 -->
             <a-marker id="marker" type="pattern" preset="hiro" raycaster="objects: .clickable">
                 <!-- 3D模型 -->
@@ -78,12 +84,6 @@
             </div>
         </div>
     </div>
-
-    <!-- 隱藏的資源 -->
-    <a-assets>
-        <a-asset-item id="model" src="models/robot.glb"></a-asset-item>
-        <img id="icon" src="images/icon.png" crossorigin="anonymous">
-    </a-assets>
 
     <script src="app.js"></script>
 </body>

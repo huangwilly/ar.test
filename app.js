@@ -111,8 +111,8 @@ function startAR() {
             const onSceneLoaded = () => {
                 console.log('✅ AR場景已載入');
                 
-                // 等待AR系統初始化
-                setTimeout(() => {
+                // 等待AR系統初始化（可能需要更長時間）
+                const waitForARSystem = () => {
                     const arSystem = scene.systems['arjs'];
                     if (arSystem) {
                         console.log('✅ AR系統已初始化');
@@ -173,45 +173,14 @@ function startAR() {
                             }
                         }, 10000);
                     } else {
-                        console.error('❌ AR系統未初始化');
-                        // 等待AR系統初始化
-                        const waitForSystem = setInterval(() => {
-                            const arSystem = scene.systems['arjs'];
-                            if (arSystem) {
-                                clearInterval(waitForSystem);
-                                console.log('✅ AR系統已初始化（延遲）');
-                                // 重新檢查相機
-                                setTimeout(() => {
-                                    const checkStatus = () => {
-                                        if (arSystem._arSource) {
-                                            const video = arSystem._arSource.domElement;
-                                            if (video && video.readyState >= 2 && video.videoWidth > 0) {
-                                                loadingScreen.classList.add('hidden');
-                                                arInitialized = true;
-                                                showNotification('AR已啟動！', 'success');
-                                                if (!resolved) {
-                                                    resolved = true;
-                                                    resolve();
-                                                }
-                                                return;
-                                            }
-                                        }
-                                        setTimeout(checkStatus, 500);
-                                    };
-                                    checkStatus();
-                                }, 1000);
-                            }
-                        }, 100);
-                        
-                        setTimeout(() => {
-                            clearInterval(waitForSystem);
-                            if (!resolved) {
-                                resolved = true;
-                                reject(new Error('AR系統初始化失敗'));
-                            }
-                        }, 5000);
+                        // 如果 AR 系統還沒初始化，繼續等待
+                        console.log('⏳ 等待 AR 系統初始化...');
+                        setTimeout(waitForARSystem, 200);
                     }
-                }, 1000);
+                };
+                
+                // 開始等待（給一些時間讓 AR.js 初始化）
+                setTimeout(waitForARSystem, 500);
             };
             
             if (scene.hasLoaded) {
