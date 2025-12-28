@@ -4,28 +4,209 @@ let videoStream = null;
 let qrScannerActive = false;
 let canvas = null;
 let ctx = null;
+let arInitialized = false;
 
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
-    initializeApp();
+    // 綁定啟動按鈕
+    const startBtn = document.getElementById('start-ar-btn');
+    const startScreen = document.getElementById('start-screen');
+    
+    startBtn.addEventListener('click', async () => {
+        // 隱藏啟動畫面，顯示載入畫面
+        startScreen.classList.add('hidden');
+        const loadingScreen = document.getElementById('loading-screen');
+        loadingScreen.classList.remove('hidden');
+        
+        try {
+            // 請求相機權限
+            await requestCameraPermission();
+            
+            // 啟動AR場景
+            await startAR();
+        } catch (error) {
+            console.error('啟動AR失敗:', error);
+            showCameraError();
+        }
+    });
+    
+    // 初始化其他功能（不需要相機的部分）
+    setupEventListeners();
+    setupCapture();
 });
 
-function initializeApp() {
-    // 等待AR場景載入
-    const scene = document.querySelector('#ar-scene');
-    const loadingScreen = document.getElementById('loading-screen');
-    
-    scene.addEventListener('loaded', () => {
-        setTimeout(() => {
-            loadingScreen.classList.add('hidden');
-        }, 1000);
-    });
+// 請求相機權限
+async function requestCameraPermission() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+                facingMode: 'environment' // 優先使用後置相機
+            } 
+        });
+        // 立即停止流，我們只需要權限
+        stream.getTracks().forEach(track => track.stop());
+        return true;
+    } catch (error) {
+        console.error('相機權限請求失敗:', error);
+        throw new Error('無法獲取相機權限。請確保已允許相機訪問權限。');
+    }
+}
 
-    // 綁定按鈕事件
-    setupEventListeners();
+// 啟動AR場景
+function startAR() {
+    return new Promise((resolve, reject) => {
+        if (arInitialized) {
+            resolve();
+            return;
+        }
+        
+        // 顯示AR容器
+        const arContainer = document.getElementById('ar-container');
+        arContainer.style.display = 'block';
+        
+        // 等待AR場景載入
+        const scene = document.querySelector('#ar-scene');
+        const loadingScreen = document.getElementById('loading-screen');
+        
+        let resolved = false;
+        
+        // 處理場景已載入的情況
+        if (scene.hasLoaded) {
+            // 場景已經載入，直接繼續
+            setTimeout(() => {
+                loadingScreen.classList.add('hidden');
+                arInitialized = true;
+                
+                // 檢查相機是否成功啟動
+                setTimeout(() => {
+                    if (checkCameraStatus()) {
+                        if (!resolved) {
+                            resolved = true;
+                            resolve();
+                        }
+                    } else {
+                        // 如果相機未啟動，等待一下再檢查
+                        setTimeout(() => {
+                            if (checkCameraStatus() && !resolved) {
+                                resolved = true;
+                                resolve();
+                            }
+                        }, 2000);
+                    }
+                }, 1000);
+            }, 500);
+        } else {
+            // 監聽場景載入事件
+            scene.addEventListener('loaded', () => {
+                setTimeout(() => {
+                    loadingScreen.classList.add('hidden');
+                    arInitialized = true;
+                    
+                    // 檢查相機是否成功啟動
+                    setTimeout(() => {
+                        if (checkCameraStatus()) {
+                            if (!resolved) {
+                                resolved = true;
+                                resolve();
+                            }
+                        } else {
+                            // 如果相機未啟動，等待一下再檢查
+                            setTimeout(() => {
+                                if (checkCameraStatus() && !resolved) {
+                                    resolved = true;
+                                    resolve();
+                                }
+                            }, 2000);
+                        }
+                    }, 1000);
+                }, 500);
+            }, { once: true });
+        }
+        
+        // 監聽AR系統錯誤
+        scene.addEventListener('arjs-video-loaded', () => {
+            console.log('AR相機已載入');
+            if (!resolved && arInitialized) {
+                resolved = true;
+                resolve();
+            }
+        });
+        
+        scene.addEventListener('arjs-nft-loaded', () => {
+            console.log('AR NFT已載入');
+        });
+        
+        // 設置超時
+        setTimeout(() => {
+            if (!arInitialized && !resolved) {
+                resolved = true;
+                reject(new Error('AR場景載入超時'));
+            }
+        }, 15000);
+    });
+}
+
+// 檢查相機狀態
+function checkCameraStatus() {
+    const scene = document.querySelector('#ar-scene');
+    if (!scene) {
+        console.error('AR場景不存在');
+        return false;
+    }
     
-    // 初始化拍照功能
-    setupCapture();
+    const arSystem = scene.systems['arjs'];
+    
+    if (!arSystem) {
+        console.error('AR系統未初始化');
+        return false;
+    }
+    
+    if (!arSystem._arSource) {
+        console.warn('AR相機源未就緒');
+        return false;
+    }
+    
+    const video = arSystem._arSource.domElement;
+    if (video && video.readyState >= 2) {
+        console.log('相機已就緒，readyState:', video.readyState);
+        return true;
+    } else if (video) {
+        console.log('相機正在載入，readyState:', video.readyState);
+        return false;
+    } else {
+        console.warn('視頻元素不存在');
+        return false;
+    }
+}
+
+// 顯示相機錯誤提示
+function showCameraError() {
+    const startScreen = document.getElementById('start-screen');
+    const loadingScreen = document.getElementById('loading-screen');
+    const startContent = startScreen.querySelector('.start-content');
+    
+    loadingScreen.classList.add('hidden');
+    startScreen.classList.remove('hidden');
+    
+    const errorMsg = document.createElement('div');
+    errorMsg.className = 'error-message';
+    errorMsg.innerHTML = `
+        <p style="color: #ff6b6b; margin-top: 20px; font-size: 16px;">
+            ⚠️ 無法訪問相機<br>
+            請確保：
+            <br>1. 已允許瀏覽器訪問相機權限
+            <br>2. 使用 HTTPS 或 localhost
+            <br>3. 設備支持相機功能
+        </p>
+    `;
+    
+    // 移除舊的錯誤消息
+    const oldError = startContent.querySelector('.error-message');
+    if (oldError) {
+        oldError.remove();
+    }
+    
+    startContent.appendChild(errorMsg);
 }
 
 function setupEventListeners() {

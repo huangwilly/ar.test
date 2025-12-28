@@ -15,7 +15,17 @@
         <p>正在載入AR場景...</p>
     </div>
 
-    <div id="ar-container">
+    <!-- 啟動畫面 -->
+    <div id="start-screen">
+        <div class="start-content">
+            <h1>AR 掃描體驗</h1>
+            <p>點擊下方按鈕開始使用相機</p>
+            <button id="start-ar-btn" class="start-btn">🎥 啟動相機</button>
+            <p class="permission-hint">首次使用需要授權相機權限</p>
+        </div>
+    </div>
+
+    <div id="ar-container" style="display: none;">
         <a-scene 
             id="ar-scene"
             vr-mode-ui="enabled: false"
